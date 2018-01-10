@@ -17,7 +17,28 @@ app.use(session({
 app.use(express.static(`${__dirname}/../build`));
 
 app.post('/login', (req, res) => {
-  // Add code here
+  const { userId } = req.body;
+  const auth0Url = `https://${process.env.REACT_APP_AUTH0_DOMAIN}/api/v2/users/${userId}`;
+  console.log(auth0Url);
+  axios.get(auth0Url, { headers: { Authorization: 'Bearer ' + process.env.AUTH0_MANAGEMENT_ACCESS_TOKEN } }).then(response => {
+    app.get('db').find_user_by_auth0_id(response.data.user_id).then(users => {
+      if (users.length) {
+        //they are already in the database
+        req.session.user = users[0];
+        res.json({ user: req.session.user });
+      } else {
+        app.get('db').create_user([ response.data.user_id, response.data.email]).then(newUsers => {
+          res.session.user = newUsers[0];
+          res.json({ user: req.session.user })
+        })
+      }
+    })
+
+  }).catch(error => {
+    // console.error(error);
+    res.status(500).json({ message: 'Oh noes!' })
+
+  })
 });
 
 app.post('/logout', (req, res) => {
@@ -25,6 +46,7 @@ app.post('/logout', (req, res) => {
   res.send();
 });
 
+  // DOUBLE CHECK THIS
 app.get('/user-data', (req, res) => {
   res.json({ user: req.session.user });
 });
